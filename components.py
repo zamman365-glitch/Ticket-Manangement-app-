@@ -142,7 +142,7 @@ def booking_summary(movie: dict[str, Any], seats: int) -> None:
         <div class="booking-summary">
             <div class="summary-row">
                 <span>Movie</span>
-                <span class="val">{movie['title']}</span>
+                <span class="val">{movie.get('movie_name', 'No Title')}</span>
             </div>
             <div class="summary-row">
                 <span>Tickets × {seats}</span>
@@ -165,40 +165,43 @@ def booking_summary(movie: dict[str, Any], seats: int) -> None:
 # ── Seat Picker ─────────────────────────────────────────────────────────────
 
 def seat_picker_visual(total: int = 60, booked: int = 0) -> None:
-    """Renders a decorative seat map (visual only — actual count via slider)."""
     import random
+    import streamlit as st
+
+    # 🛡️ SAFETY FIX (MOST IMPORTANT PART)
+    if total <= 0:
+        total = 1
+
+    if booked < 0:
+        booked = 0
+
+    if booked > total:
+        booked = total
 
     random.seed(booked)
-    taken_indices = random.sample(range(total), min(booked, total))
+
+    # now safe
+    taken_indices = random.sample(range(total), booked)
 
     rows_per_row = 10
     num_rows = total // rows_per_row
     labels = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
-    rows_html = ""
+    html = ""
     idx = 0
+
     for r in range(num_rows):
-        row_html = f'<span style="font-size:10px;color:var(--text-muted);margin-right:6px;width:14px;display:inline-block;">{labels[r]}</span>'
+        row_html = f"<div><b>{labels[r]}</b> "
+
         for _ in range(rows_per_row):
             cls = "seat taken" if idx in taken_indices else "seat"
-            row_html += f'<div class="{cls}"></div>'
+            row_html += f'<span class="{cls}">⬜</span>'
             idx += 1
-        rows_html += f'<div class="seat-row" style="align-items:center;">{row_html}</div>'
 
-    st.markdown(
-        f"""
-        <div class="seat-grid">
-            <div class="seat-screen"></div>
-            {rows_html}
-            <div class="seat-legend">
-                <div><span class="legend-dot" style="background:var(--bg-elevated);border:1px solid var(--border);"></span> Available</div>
-                <div><span class="legend-dot" style="background:var(--bms-red);"></span> Selected</div>
-                <div><span class="legend-dot" style="background:#2a2a2a;opacity:0.5;"></span> Booked</div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+        row_html += "</div>"
+        html += row_html
+
+    st.markdown(html, unsafe_allow_html=True)
 
 
 # ── Banners ─────────────────────────────────────────────────────────────────
@@ -238,7 +241,7 @@ def booking_history_card(b: dict[str, Any]) -> None:
         f"""
         <div class="history-card">
             <div>
-                <p class="history-movie-name">🎬 {b['title']}</p>
+                <p class="history-movie-name">🎬 {b.get('movie_name', 'No Title')}</p>
                 <div class="history-meta">
                     <span>🎭 {b.get('genre','')}</span>
                     <span>🌐 {b.get('language','')}</span>

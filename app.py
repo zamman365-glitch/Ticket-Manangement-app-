@@ -205,17 +205,19 @@ def page_home() -> None:
 
 def page_book() -> None:
     movie = st.session_state.selected_movie
+
+    # safety check
     if not movie:
         st.session_state.page = "home"
         st.rerun()
 
-    # ── Back button ────────────────────────────────────────────────────────
+    # Back button
     if st.button("← Back to Movies", key="btn_back"):
         st.session_state.page = "home"
         st.session_state.selected_movie = None
         st.rerun()
 
-    # ── Post-booking confirmation screen ──────────────────────────────────
+    # Booking success screen
     if st.session_state.booking_done:
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown(
@@ -235,6 +237,7 @@ def page_book() -> None:
             """,
             unsafe_allow_html=True,
         )
+
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
             if st.button("🏠 Browse More Movies", key="btn_moremovies"):
@@ -242,50 +245,59 @@ def page_book() -> None:
                 st.session_state.selected_movie = None
                 st.session_state.booking_done = False
                 st.rerun()
+
             if st.button("📋 View My Bookings", key="btn_view_bookings"):
                 st.session_state.page = "my_bookings"
                 st.session_state.booking_done = False
                 st.rerun()
+
         return
 
-    # ── Movie detail + booking panel layout ───────────────────────────────
+    # Layout
     left, right = st.columns([3, 2], gap="large")
 
     with left:
         section_header("MOVIE DETAILS")
 
-        # Poster + info side by side
+        # Poster
         pcol, icol = st.columns([1, 2], gap="medium")
+
         with pcol:
             poster = movie.get("poster_url", "")
             if poster:
                 st.image(poster, use_container_width=True)
             else:
                 st.markdown(
-                    '<div class="movie-poster-placeholder" style="border-radius:8px;">🎬</div>',
+                    '<div class="movie-poster-placeholder">🎬</div>',
                     unsafe_allow_html=True,
                 )
 
+        # Movie info
         with icol:
             st.markdown(
                 f"""
                 <div style="padding-top:8px;">
                     <h1 style="font-family:'Bebas Neue',sans-serif;font-size:36px;
                                color:var(--text-primary);margin:0 0 12px;letter-spacing:2px;">
-                        {movie['title']}
+                        {movie.get('movie_name', 'No Title')}
                     </h1>
+
                     <div class="movie-meta" style="margin-bottom:14px;">
                         <span class="tag tag-genre">{movie.get('genre','')}</span>
                         <span class="tag tag-lang">{movie.get('language','')}</span>
                         <span class="tag tag-rating">⭐ {movie.get('rating','U/A')}</span>
                         <span class="tag">🕐 {movie.get('duration_mins','')} min</span>
                     </div>
+
                     <p style="color:var(--text-secondary);font-size:14px;line-height:1.7;margin-bottom:16px;">
                         {movie.get('description') or 'No description available.'}
                     </p>
+
                     <div style="font-size:13px;color:var(--text-muted);">
-                        🗓 Release: <strong style="color:var(--text-primary);">
-                        {movie.get('release_date','')}</strong>
+                        🗓 Release:
+                        <strong style="color:var(--text-primary);">
+                            {movie.get('release_date','')}
+                        </strong>
                     </div>
                 </div>
                 """,
@@ -294,61 +306,52 @@ def page_book() -> None:
 
         # Seat map
         section_header("SELECT YOUR SEATS")
-        total_seats  = movie.get("total_seats", 60) or 60
-        avail_seats  = movie.get("available_seats", 0) or 0
+        total_seats = movie.get("total_seats", 60) or 60
+        avail_seats = movie.get("available_seats", 0) or 0
         booked_seats = total_seats - avail_seats
+
         seat_picker_visual(total=total_seats, booked=booked_seats)
 
     with right:
-        st.markdown(
-            '<div class="booking-panel">',
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            '<div class="booking-panel-title">CONFIRM BOOKING</div>',
-            unsafe_allow_html=True,
-        )
+        st.markdown('<div class="booking-panel">', unsafe_allow_html=True)
+        st.markdown('<div class="booking-panel-title">CONFIRM BOOKING</div>', unsafe_allow_html=True)
 
         banner_info(f"Logged in as User #{st.session_state.user_id}")
+
+        # 🚨 IMPORTANT FIX: prevent crash when no seats
+        if avail_seats < 1:
+            banner_error("❌ Housefull! No seats available.")
+            st.markdown("</div>", unsafe_allow_html=True)
+            return
+
+        max_seats = min(10, avail_seats)
 
         seats = st.slider(
             "Number of seats",
             min_value=1,
-            max_value=min(10, avail_seats),
+            max_value=max_seats,
             value=1,
             key="seats_slider",
         )
 
         booking_summary(movie, seats)
 
-        st.markdown(
-            f"""
-            <div style="margin:12px 0;font-size:12px;color:var(--text-muted);
-                        text-align:center;">
-                {avail_seats} seats remaining · Max 10 per booking
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
         if st.button("🎟 PAY & CONFIRM", key="btn_confirm_booking"):
             result = book_ticket(
                 user_id=st.session_state.user_id,
-                movie_id=movie["movie_id"],
+                movie_id=movie.get("movie_id"),
                 seats=seats,
             )
+
             if result.success:
                 st.session_state.booking_done = True
                 st.session_state.last_booking_id = result.booking_id
-                # Refresh movie data in session
                 st.session_state.selected_movie = None
                 st.rerun()
             else:
                 banner_error(result.message)
 
         st.markdown("</div>", unsafe_allow_html=True)
-
-
 # ══════════════════════════════════════════════════════════════════════════════
 # Page: My Bookings
 # ══════════════════════════════════════════════════════════════════════════════
